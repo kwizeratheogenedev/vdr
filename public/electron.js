@@ -792,11 +792,15 @@ ipcMain.handle('cancel-download', async (event, downloadId) => {
 
 // Pause a download (POSIX: send SIGSTOP)
 ipcMain.handle('pause-download', async (event, downloadId) => {
-  if (!downloadId || !activeDownloads.has(downloadId)) {
-    return { success: false, error: 'Download not found' };
+  const id = Number(downloadId);
+  console.log(`IPC pause-download requested for id: ${downloadId} (coerced: ${id})`);
+  if (!Number.isFinite(id) || !activeDownloads.has(id)) {
+    const msg = 'Download not found';
+    console.warn(msg, { requestedId: downloadId });
+    return { success: false, error: msg };
   }
 
-  const downloadData = activeDownloads.get(downloadId);
+  const downloadData = activeDownloads.get(id);
   try {
     const proc = downloadData.process;
     if (!proc || proc.killed) return { success: false, error: 'Process not running' };
@@ -805,26 +809,38 @@ ipcMain.handle('pause-download', async (event, downloadId) => {
       return { success: false, error: 'Pause not supported on Windows (SIGSTOP unavailable)' };
     }
 
-    process.kill(proc.pid, 'SIGSTOP');
+    // Attempt to pause the process
+    try {
+      process.kill(proc.pid, 'SIGSTOP');
+    } catch (err) {
+      console.error('Failed to send SIGSTOP', err);
+      return { success: false, error: 'Failed to pause process: ' + (err.message || String(err)) };
+    }
+
     downloadData.paused = true;
 
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('download-progress', { downloadId, paused: true, message: 'Download paused' });
+      mainWindow.webContents.send('download-progress', { downloadId: id, paused: true, message: 'Download paused' });
     }
 
     return { success: true };
   } catch (error) {
+    console.error('Error in pause-download handler:', error);
     return { success: false, error: error.message };
   }
 });
 
 // Resume a paused download (POSIX: send SIGCONT)
 ipcMain.handle('resume-download', async (event, downloadId) => {
-  if (!downloadId || !activeDownloads.has(downloadId)) {
-    return { success: false, error: 'Download not found' };
+  const id = Number(downloadId);
+  console.log(`IPC resume-download requested for id: ${downloadId} (coerced: ${id})`);
+  if (!Number.isFinite(id) || !activeDownloads.has(id)) {
+    const msg = 'Download not found';
+    console.warn(msg, { requestedId: downloadId });
+    return { success: false, error: msg };
   }
 
-  const downloadData = activeDownloads.get(downloadId);
+  const downloadData = activeDownloads.get(id);
   try {
     const proc = downloadData.process;
     if (!proc || proc.killed) return { success: false, error: 'Process not running' };
@@ -833,15 +849,22 @@ ipcMain.handle('resume-download', async (event, downloadId) => {
       return { success: false, error: 'Resume not supported on Windows (SIGCONT unavailable)' };
     }
 
-    process.kill(proc.pid, 'SIGCONT');
+    try {
+      process.kill(proc.pid, 'SIGCONT');
+    } catch (err) {
+      console.error('Failed to send SIGCONT', err);
+      return { success: false, error: 'Failed to resume process: ' + (err.message || String(err)) };
+    }
+
     downloadData.paused = false;
 
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('download-progress', { downloadId, paused: false, message: 'Download resumed' });
+      mainWindow.webContents.send('download-progress', { downloadId: id, paused: false, message: 'Download resumed' });
     }
 
     return { success: true };
   } catch (error) {
+    console.error('Error in resume-download handler:', error);
     return { success: false, error: error.message };
   }
 });

@@ -648,6 +648,7 @@ function App() {
     if (!window.electronAPI) return;
     try {
       const result = await window.electronAPI.pauseDownload(downloadId);
+      console.log('pauseDownload result:', result, 'for', downloadId);
       if (result.success) {
         setActiveDownloads(prev => {
           const newDownloads = new Map(prev);
@@ -668,6 +669,7 @@ function App() {
     if (!window.electronAPI) return;
     try {
       const result = await window.electronAPI.resumeDownload(downloadId);
+      console.log('resumeDownload result:', result, 'for', downloadId);
       if (result.success) {
         setActiveDownloads(prev => {
           const newDownloads = new Map(prev);
@@ -882,6 +884,8 @@ function App() {
                           download={download}
                           onCancel={cancelDownload}
                           onOpenFile={openFileLocation}
+                          onPause={pauseDownload}
+                          onResume={resumeDownload}
                         />
                       ))}
                     </div>
@@ -903,6 +907,8 @@ function App() {
                           download={download}
                           onCancel={cancelDownload}
                           onOpenFile={openFileLocation}
+                          onPause={pauseDownload}
+                          onResume={resumeDownload}
                         />
                       ))}
                     </div>
