@@ -2,7 +2,12 @@ const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
-const isDev = require('electron-is-dev');
+
+// Fix PATH to include user binaries (needed for yt-dlp and node)
+const userBinPath = path.join(process.env.HOME, '.local', 'bin');
+if (!process.env.PATH.includes(userBinPath)) {
+  process.env.PATH = userBinPath + ':' + process.env.PATH;
+}
 
 let mainWindow;
 let activeDownloads = new Map(); // Track multiple downloads by ID
@@ -161,10 +166,15 @@ const stopSpeedMonitoring = (downloadId) => {
   }
 };
 
-// Initialize download history on app ready
-loadDownloadHistory();
+// Initialize download history on app ready - moved inside createWindow
 
 function createWindow() {
+  // Use app.isPackaged to determine if running in development or production
+  const isDev = !app.isPackaged;
+  
+  // Load download history after app is ready
+  loadDownloadHistory();
+  
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -295,14 +305,22 @@ ipcMain.handle('get-video-info', async (event, url) => {
   
   return new Promise((resolve) => {
     try {
+      // Add --js-runtime flag to explicitly tell yt-dlp to use node
       const ytDlp = spawn('yt-dlp', [
         '--dump-json',
         '--no-playlist',
+        '--js-runtime', 'node',
         url
       ]);
 
       let data = '';
       let errorData = '';
+
+      // Set a timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        ytDlp.kill();
+        resolve({ success: false, error: 'Request timed out. Check your internet connection.' });
+      }, 60000); // 60 second timeout
 
       ytDlp.stdout.on('data', (chunk) => {
         data += chunk.toString();
@@ -313,6 +331,7 @@ ipcMain.handle('get-video-info', async (event, url) => {
       });
 
       ytDlp.on('close', (code) => {
+        clearTimeout(timeout);
         if (code === 0) {
           try {
             const info = JSON.parse(data);
@@ -341,6 +360,7 @@ ipcMain.handle('get-video-info', async (event, url) => {
       });
 
       ytDlp.on('error', (error) => {
+        clearTimeout(timeout);
         resolve({ success: false, error: error.message || 'Failed to start yt-dlp process' });
       });
     } catch (error) {
@@ -442,7 +462,7 @@ ipcMain.handle('download-video', async (event, options) => {
   
   // Check if video was already downloaded (in-memory history)
   const existingDownload = downloadedVideos.get(options.url);
-  if (existingDownload) {
+  if (existingDownload && !options.force) {
     // Check if file still exists
     if (fs.existsSync(existingDownload.filePath)) {
       return { 
@@ -459,8 +479,20 @@ ipcMain.handle('download-video', async (event, options) => {
     }
   }
   
+  // Check for partial downloads (.part files) - allow resume
+  const partialFilePath = options.outputPath + '.part';
+  const partialFileExists = fs.existsSync(partialFilePath);
+  const ytDlpPartialPath = path.join(options.outputPath, '%(title)s.%(ext)s.part');
+  let partialFiles = [];
+  try {
+    if (fs.existsSync(options.outputPath)) {
+      partialFiles = fs.readdirSync(options.outputPath).filter(f => f.endsWith('.part'));
+    }
+  } catch (e) {}
+  const hasPartialDownload = partialFiles.length > 0;
+  
   // Check if a file with the same video title already exists in the download folder
-  if (videoTitle) {
+  if (videoTitle && !options.force) {
     const existingFile = checkExistingVideoFile(options.outputPath, videoTitle);
     if (existingFile.exists) {
       return {
@@ -554,6 +586,8 @@ ipcMain.handle('download-video', async (event, options) => {
       '--newline',
       '--no-playlist',
       '-o', path.join(outputPath, '%(title)s.%(ext)s'),
+      // Resume partial downloads based on force flag
+      ...(options.force ? ['--no-continue'] : ['--continue']),
       // Simplified speed optimization - only valid options
       '--concurrent-fragments', '16', // Force high concurrency
       '--buffer-size', '64K', // Good buffer size
@@ -1007,4 +1041,83 @@ ipcMain.handle('get-download-history', async () => {
 ipcMain.handle('clear-download-history', async () => {
   downloadedVideos.clear();
   return { success: true };
+});
+
+// Settings management
+const getSettingsFilePath = () => {
+  const userDataPath = app.getPath('userData');
+  return path.join(userDataPath, 'settings.json');
+};
+
+// Default settings
+const defaultSettings = {
+  downloadPath: getDefaultDownloadFolder(),
+  networkQuality: 'fast',
+  notificationsEnabled: true,
+  autoOpenFolder: false,
+  maxConcurrentDownloads: 3
+};
+
+// Load settings from disk
+const loadSettings = () => {
+  try {
+    const settingsPath = getSettingsFilePath();
+    if (fs.existsSync(settingsPath)) {
+      const data = fs.readFileSync(settingsPath, 'utf8');
+      return { ...defaultSettings, ...JSON.parse(data) };
+    }
+  } catch (error) {
+    console.error('Failed to load settings:', error);
+  }
+  return defaultSettings;
+};
+
+// Save settings to disk
+const saveSettings = (settings) => {
+  try {
+    const settingsPath = getSettingsFilePath();
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Get settings
+ipcMain.handle('get-settings', async () => {
+  return loadSettings();
+});
+
+// Update settings
+ipcMain.handle('update-settings', async (event, newSettings) => {
+  const currentSettings = loadSettings();
+  const updatedSettings = { ...currentSettings, ...newSettings };
+  return saveSettings(updatedSettings);
+});
+
+// Check notifications support
+ipcMain.handle('check-notifications-support', async () => {
+  return { supported: true };
+});
+
+// Placeholder handlers for future features
+ipcMain.handle('direct-download', async () => {
+  return { success: false, error: 'Direct download feature not yet implemented' };
+});
+
+ipcMain.handle('download-torrent', async () => {
+  return { success: false, error: 'Torrent download feature not yet implemented' };
+});
+
+ipcMain.handle('get-browser-list', async () => {
+  return { success: false, error: 'Browser integration not yet implemented' };
+});
+
+ipcMain.handle('extract-browser-cookies', async () => {
+  return { success: false, error: 'Browser integration not yet implemented' };
+});
+
+ipcMain.handle('set-default-download-manager', async () => {
+  return { success: false, error: 'This feature is not supported on Linux' };
 });

@@ -26,10 +26,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     return ipcRenderer.invoke('download-video', options);
   },
+  // Direct download - for movies, songs, pictures, PDFs and any file type
+  directDownload: (options) => {
+    if (!options || typeof options !== 'object') {
+      return Promise.resolve({ success: false, error: 'Invalid options' });
+    }
+    return ipcRenderer.invoke('direct-download', options);
+  },
+  // Torrent download - for magnet links and .torrent files
+  downloadTorrent: (options) => {
+    if (!options || typeof options !== 'object') {
+      return Promise.resolve({ success: false, error: 'Invalid options' });
+    }
+    return ipcRenderer.invoke('download-torrent', options);
+  },
   cancelDownload: (downloadId) => ipcRenderer.invoke('cancel-download', downloadId),
   cancelAllDownloads: () => ipcRenderer.invoke('cancel-all-downloads'),
   getActiveDownloads: () => ipcRenderer.invoke('get-active-downloads'),
   checkYtDlp: () => ipcRenderer.invoke('check-yt-dlp'),
+  getBrowserList: () => ipcRenderer.invoke('get-browser-list'),
+  extractBrowserCookies: (browser) => ipcRenderer.invoke('extract-browser-cookies', browser),
   pauseDownload: (downloadId) => ipcRenderer.invoke('pause-download', downloadId),
   resumeDownload: (downloadId) => ipcRenderer.invoke('resume-download', downloadId),
   
@@ -82,5 +98,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
     if (channel && typeof channel === 'string') {
       ipcRenderer.removeAllListeners(channel);
     }
+  },
+  
+  // Settings
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  updateSettings: (settings) => ipcRenderer.invoke('update-settings', settings),
+  setAsDefaultDownloadManager: () => ipcRenderer.invoke('set-default-download-manager'),
+  checkNotificationsSupport: () => ipcRenderer.invoke('check-notifications-support'),
+  
+  // Protocol URL handler
+  onOpenUrl: (callback) => {
+    if (typeof callback !== 'function') {
+      return () => {};
+    }
+    const subscription = (event, url) => callback(url);
+    ipcRenderer.on('open-url', subscription);
+    return () => ipcRenderer.removeListener('open-url', subscription);
+  },
+  
+  // Protocol URL handler (for when app is already open)
+  onProtocolUrl: (callback) => {
+    if (typeof callback !== 'function') {
+      return () => {};
+    }
+    const subscription = (event, url) => callback(url);
+    ipcRenderer.on('protocol-url', subscription);
+    return () => ipcRenderer.removeListener('protocol-url', subscription);
   }
 });
