@@ -78,7 +78,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     if (typeof callback !== 'function') {
       return () => {};
     }
-    const subscription = (event, data) => callback(data);
+    const subscription = (event, data) => {
+      
+      callback(data);
+    };
     ipcRenderer.on('download-progress', subscription);
     return () => ipcRenderer.removeListener('download-progress', subscription);
   },
@@ -91,6 +94,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const subscription = (event, data) => callback(data);
     ipcRenderer.on('speed-optimization', subscription);
     return () => ipcRenderer.removeListener('speed-optimization', subscription);
+  },
+  
+  // Network speed detection
+  onNetworkSpeedDetected: (callback) => {
+    if (typeof callback !== 'function') {
+      return () => {};
+    }
+    const subscription = (event, data) => callback(data);
+    ipcRenderer.on('network-speed-detected', subscription);
+    return () => ipcRenderer.removeListener('network-speed-detected', subscription);
   },
   
   // Cleanup
