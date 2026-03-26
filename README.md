@@ -38,11 +38,49 @@ Or download from: https://github.com/yt-dlp/yt-dlp/releases
 
 ## Installation
 
-1. Clone or download this repository
+### Option 1: Download Pre-built Installer (Recommended)
+
+Get the latest release for your operating system from [GitHub Releases](https://github.com/kwizeratheogenedev/vdr/releases):
+
+**Windows (.exe)**:
+1. Download `VDR Video Downloader-*.exe`
+2. Run the installer
+3. Follow the installation wizard
+4. App will be available in Start Menu
+
+**macOS (.dmg)**:
+1. Download `VDR Video Downloader-*.dmg`
+2. Open the DMG file
+3. Drag app to Applications folder
+4. Launch from Applications
+
+**Linux (.AppImage)**:
+1. Download `VDR Video Downloader-*.AppImage`
+2. Make it executable:
+```bash
+chmod +x VDR\ Video\ Downloader-*.AppImage
+```
+3. Run it directly or add to app menu
+
+### Option 2: Build from Source
+
+1. Clone the repository:
+```bash
+git clone https://github.com/kwizeratheogenedev/vdr.git
+cd vdr
+```
+
 2. Install dependencies:
 ```bash
 npm install
 ```
+
+3. Build for your OS:
+```bash
+npm run electron-pack
+```
+
+4. Find installer in `dist/` folder
 
 ## Running the Application
 
