@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 
 export function useDownloadProgress({ setActiveDownloads, setCompletedDownloads }) {
   useEffect(() => {
-    if (!window.electronAPI) return;
+    if (!window.electronAPI || !window.electronAPI.onDownloadProgress) return;
 
     const unsubscribe = window.electronAPI.onDownloadProgress((data) => {
       setActiveDownloads(prev => {
@@ -21,15 +21,17 @@ export function useDownloadProgress({ setActiveDownloads, setCompletedDownloads 
             });
             
             if (data.completed) {
+              // Capture current download state to avoid stale closure
+              const completedDownload = {
+                ...download,
+                completed: true,
+                progress: 100,
+                filePath: data.filePath
+              };
               setTimeout(() => {
                 setCompletedDownloads(prev => {
                   const completed = new Map(prev);
-                  completed.set(data.downloadId, {
-                    ...download,
-                    completed: true,
-                    progress: 100,
-                    filePath: data.filePath
-                  });
+                  completed.set(data.downloadId, completedDownload);
                   return completed;
                 });
                 newDownloads.delete(data.downloadId);

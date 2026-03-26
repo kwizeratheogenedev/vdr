@@ -114,6 +114,21 @@ This application supports over 1000 websites including:
 ### "yt-dlp not found" Error
 Make sure `yt-dlp` is installed and available in your system's PATH.
 
+### Impersonation Errors
+If you see an error such as:
+
+```
+Impersonate target "chrome" is not available. Use --list-impersonate-targets to see available targets.
+```
+
+it means the optional Python dependency `curl_cffi` (used by yt‑dlp for browser header emulation) isn't installed. Either install it with:
+
+```sh
+pip install curl_cffi          # or pip install yt-dlp[all]
+```
+
+or the application will automatically skip the impersonation flags and continue without them.
+
 ### Download Fails
 - Check your internet connection
 - Verify the video URL is correct
@@ -122,6 +137,11 @@ Make sure `yt-dlp` is installed and available in your system's PATH.
 
 ### Format Selection Issues
 Not all videos are available in all formats. The application will show only the formats available for the specific video.
+
+### Universal / "Download everything" Mode
+The quick download box can now handle **any URL** – images, videos, documents, generic web pages, etc. Under the hood the app invokes yt‑dlp in a generic mode and will attempt to fetch any media it understands. For simple image/video links the content is downloaded directly; for other pages it will try to scrape and download all media items it can find (including thumbnails and metadata when the "download everything" option is enabled).
+
+You can still fall back to the manual "direct download" button if you only need to grab a single file.
 
 ## Security Note
 

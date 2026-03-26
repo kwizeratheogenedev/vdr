@@ -14,6 +14,18 @@ function DownloadCard({ download, onSelect, onOpenFile, onDelete }) {
     return 'bg-blue-500';
   };
 
+  const copyToClipboard = async (text, successMessage) => {
+    if (window.electronAPI?.copyToClipboard) {
+      const result = await window.electronAPI.copyToClipboard(text);
+      if (result.success) {
+        // Could show a toast here, but for now we'll just rely on the parent component's showMessage
+        console.log(successMessage);
+      } else {
+        console.error('Failed to copy to clipboard');
+      }
+    }
+  };
+
   return (
     <div 
       className="group relative bg-black/40 backdrop-blur-sm rounded-xl border border-white/5 hover:bg-black/50 hover:border-white/10 transition-all duration-200 cursor-pointer"
@@ -26,9 +38,23 @@ function DownloadCard({ download, onSelect, onOpenFile, onDelete }) {
           
           {/* Title */}
           <div className="flex-1 min-w-0">
-            <h4 className="text-white text-sm truncate">
-              {download.title || (isCompleted ? 'Download Complete' : isFailed ? 'Download Failed' : isDownloading ? 'Downloading...' : 'Unknown')}
-            </h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-white text-sm truncate flex-1">
+                {download.title || (isCompleted ? 'Download Complete' : isFailed ? 'Download Failed' : isDownloading ? 'Downloading...' : 'Unknown')}
+              </h4>
+              {download.title && (
+                <button 
+                  className="opacity-0 group-hover:opacity-100 p-1 text-white/60 hover:text-white hover:bg-white/10 rounded transition-all duration-200"
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    copyToClipboard(download.title, 'Title copied to clipboard'); 
+                  }}
+                  title="Copy title"
+                >
+                  <Icons.Copy />
+                </button>
+              )}
+            </div>
           </div>
           
           {/* Progress, Speed, ETA */}
@@ -47,14 +73,38 @@ function DownloadCard({ download, onSelect, onOpenFile, onDelete }) {
           
           {/* Actions - appear on hover */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            {isCompleted && download.filePath && (
+            {download.url && (
               <button 
-                className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-all"
-                onClick={(e) => { e.stopPropagation(); onOpenFile(download.filePath); }}
-                title="Open folder"
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-all"
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  copyToClipboard(download.url, 'URL copied to clipboard'); 
+                }}
+                title="Copy URL"
               >
-                <Icons.Folder className="w-4 h-4" />
+                <Icons.Copy />
               </button>
+            )}
+            {isCompleted && download.filePath && (
+              <>
+                <button 
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-all"
+                  onClick={(e) => { e.stopPropagation(); onOpenFile(download.filePath); }}
+                  title="Open folder"
+                >
+                  <Icons.Folder className="w-4 h-4" />
+                </button>
+                <button 
+                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 transition-all"
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    copyToClipboard(download.filePath, 'File path copied to clipboard'); 
+                  }}
+                  title="Copy file path"
+                >
+                  <Icons.Copy />
+                </button>
+              </>
             )}
             <button 
               className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all"

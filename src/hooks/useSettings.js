@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export function useSettings() {
   const [settings, setSettings] = useState({
@@ -8,7 +8,11 @@ export function useSettings() {
     customHeaders: ''
   });
 
-  const loadSettings = async () => {
+  // Use ref to avoid stale closure issues
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+
+  const loadSettings = useCallback(async () => {
     if (window.electronAPI?.getSettings) {
       const loadedSettings = await window.electronAPI.getSettings();
       if (loadedSettings) {
@@ -20,19 +24,25 @@ export function useSettings() {
         });
       }
     }
-  };
+  }, []);
 
-  const updateSettings = async (newSettings) => {
-    const updatedSettings = { ...settings, ...newSettings };
-    setSettings(updatedSettings);
-    if (window.electronAPI?.updateSettings) {
-      await window.electronAPI.updateSettings(updatedSettings);
-    }
-  };
+  const updateSettings = useCallback(async (newSettings) => {
+    // Use functional update to avoid stale closure
+    setSettings(prev => {
+      const updatedSettings = { ...prev, ...newSettings };
+      // Save to backend asynchronously (don't wait)
+      if (window.electronAPI?.updateSettings) {
+        window.electronAPI.updateSettings(updatedSettings).catch(err => {
+          console.error('Failed to save settings:', err);
+        });
+      }
+      return updatedSettings;
+    });
+  }, []);
 
   useEffect(() => {
     loadSettings();
-  }, []);
+  }, [loadSettings]);
 
   return { settings, updateSettings, loadSettings };
 }

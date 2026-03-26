@@ -4,7 +4,8 @@
     "no-unused-vars": "warn",
     "no-console": "off",
     "react/prop-types": "off",
-    "react-hooks/exhaustive-deps": "warn"
+    "react-hooks/exhaustive-deps": "warn",
+    "no-use-before-define": "off"
   },
   "env": {
     "browser": true,
