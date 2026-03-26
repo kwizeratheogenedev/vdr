@@ -11,14 +11,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: linux
+          - os: windows-latest
+            target: win
+          - os: macos-latest
+            target: mac
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
@@ -27,39 +33,38 @@ jobs:
         run: npm ci
 
       - name: Build application
-        run: npm run electron-pack
+        run: npm run electron-pack -- --${{ matrix.target }}
 
-      - name: Upload Linux artifacts
-        if: runner.os == 'Linux'
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: vdr-${{ matrix.target }}
+          path: dist/**
+
+  publish:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub release and upload assets
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/*.AppImage
-            dist/*.AppImage.blockmap
-            dist/*.deb
-            dist/latest-linux.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            artifacts/*/dist/*.AppImage
+            artifacts/*/dist/*.deb
+            artifacts/*/dist/*.exe
+            artifacts/*/dist/*.dmg
+            artifacts/*/dist/*.zip
+            artifacts/*/dist/*.yml
+        draft: false
+        prerelease: false
+        token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows artifacts
-        if: runner.os == 'Windows'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/*.exe
-            dist/*.exe.blockmap
-            dist/latest.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload macOS artifacts
-        if: runner.os == 'macOS'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            dist/*.dmg
-            dist/*.dmg.blockmap
-            dist/*.zip
-            dist/latest-mac.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
